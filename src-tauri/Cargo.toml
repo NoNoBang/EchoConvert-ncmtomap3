@@ -16,17 +16,24 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 
 # For NCM decryption
-aes = "0.8"
+aes = { version = "0.8", features = ["hazmat"] }
 rc4 = "0.1"
 hex = "0.4"
+base64 = "0.22"
+md5 = "0.7"
 
 # For file operations
 walkdir = "2"
 anyhow = "1.0"
 thiserror = "1.0"
 
-# Optional: for audio metadata
-metaflac = "0.2"
+# For audio - using ffmpeg via C bindings would be complex
+# Instead we'll extract the raw audio and write it directly
+cpal = { version = "0.18", optional = true }
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem

@@ -4,8 +4,22 @@
 mod ncm;
 
 use tauri::Manager;
+use log::LevelFilter;
 
 fn main() {
+    // Initialize logging
+    #[cfg(debug_assertions)]
+    env_logger::Builder::from_default_env()
+        .filter_level(LevelFilter::Debug)
+        .init();
+    
+    #[cfg(not(debug_assertions))]
+    env_logger::Builder::from_default_env()
+        .filter_level(LevelFilter::Info)
+        .init();
+    
+    log::info!("Starting NCM to MP3 converter");
+    
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![convert_ncm_files])
         .run(tauri::generate_context!())
@@ -14,10 +28,18 @@ fn main() {
 
 #[tauri::command]
 async fn convert_ncm_files(files: Vec<String>) -> Result<String, String> {
-    // TODO: Implement NCM to MP3 conversion logic here
+    log::info!("Converting {} files", files.len());
     
     match ncm::convert(&files) {
-        Ok(count) => Ok(format!("Successfully converted {} files", count)),
-        Err(e) => Err(format!("Conversion error: {}", e)),
+        Ok(count) => {
+            let message = format!("Successfully converted {} files", count);
+            log::info!("{}", message);
+            Ok(message)
+        }
+        Err(e) => {
+            let error_msg = format!("Conversion error: {}", e);
+            log::error!("{}", error_msg);
+            Err(error_msg)
+        }
     }
 }
