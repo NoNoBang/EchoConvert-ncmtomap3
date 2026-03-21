@@ -1,0 +1,38 @@
+[package]
+name = "ncm2mp3"
+version = "1.0.0"
+description = "Convert NetEase Cloud Music NCM files to MP3"
+authors = ["you"]
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["shell-open"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+# For NCM decryption
+aes = "0.8"
+rc4 = "0.1"
+hex = "0.4"
+
+# For file operations
+walkdir = "2"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Optional: for audio metadata
+metaflac = "0.2"
+
+[features]
+# This feature is used for production builds or when `devPath` points to the filesystem
+# and must be enabled in `tauri.conf.json`. Do not remove!!
+custom-protocol = ["tauri/custom-protocol"]
+
+[[bin]]
+name = "ncm2mp3"
+path = "src/main.rs"
