@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoConvert - 极简音乐转换器</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'echo-bg': '#E8E2D8',     // 米色背景
+                        'echo-gray': '#BFC6C4',   // 灰绿辅助
+                        'echo-green': '#6F8F72',  // 森林绿主色
+                        'echo-orange': '#F2A65A', // 暖橙强调
+                        'echo-dark': '#4A5553',   // 墨墨绿文字
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #E8E2D8;
+            color: #4A5553;
+            -webkit-font-smoothing: antialiased;
+        }
+        .nav-link-active {
+            color: #6F8F72;
+            font-weight: 700;
+        }
+        .nav-link-active::after {
+            content: '';
+            display: block;
+            width: 20px;
+            height: 3px;
+            background: #6F8F72;
+            margin: 4px auto 0;
+            border-radius: 2px;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(191, 198, 196, 0.3);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #BFC6C4;
+            border-radius: 10px;
+        }
+        .btn-bounce:active {
+            transform: scale(0.95);
+        }
+        .selection-glow {
+            box-shadow: 0 0 15px rgba(242, 166, 90, 0.2);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    <div id="app" class="flex flex-col h-full">
+        <!-- Header Section -->
+        <header class="h-20 flex-shrink-0 px-12 flex items-center justify-between border-b border-echo-gray/20 bg-white/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-echo-green rounded-xl flex items-center justify-center">
+                    <i data-lucide="waves" class="text-white w-6 h-6"></i>
+                </div>
+                <div class="leading-none">
+                    <h1 class="text-xl font-bold tracking-tight text-echo-dark">EchoConvert</h1>
+                    <span class="text-[10px] font-bold text-echo-green/60 tracking-widest uppercase">回声转换</span>
+                </div>
+            </div>
+
+            <nav class="flex gap-16">
+                <button @click="view = 'online'" :class="['text-sm transition-all', view === 'online' ? 'nav-link-active' : 'text-echo-gray hover:text-echo-dark']">
+                    在线歌单
+                </button>
+                <button @click="view = 'offline'" :class="['text-sm transition-all', view === 'offline' ? 'nav-link-active' : 'text-echo-gray hover:text-echo-dark']">
+                    本地转换
+                </button>
+            </nav>
+
+            <div class="flex items-center gap-6">
+                <button class="text-echo-gray hover:text-echo-green transition-colors">
+                    <i data-lucide="folder-open" class="w-5 h-5"></i>
+                </button>
+                <button class="text-echo-gray hover:text-echo-green transition-colors">
+                    <i data-lucide="info" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Section -->
+        <main class="flex-1 overflow-y-auto p-12 custom-scroll">
+            <div class="max-w-4xl mx-auto h-full">
+                
+                <!-- Online View -->
+                <div v-if="view === 'online'" class="space-y-8 h-full">
+                    <div class="glass-panel p-10 rounded-[32px] shadow-sm">
+                        <h2 class="text-2xl font-bold text-echo-dark mb-2">解析在线歌单</h2>
+                        <p class="text-sm text-echo-gray mb-8 font-medium">输入网易云音乐歌单链接，快速同步并批量下载音频文件。</p>
+                        
+                        <div class="flex gap-4">
+                            <div class="relative flex-1">
+                                <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-echo-gray"></i>
+                                <input 
+                                    v-model="inputUrl"
+                                    type="text" 
+                                    placeholder="粘贴歌单链接或 ID..." 
+                                    class="w-full h-14 pl-12 pr-4 bg-white/60 border border-echo-gray/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-echo-green/20 text-sm transition-all"
+                                >
+                            </div>
+                            <button @click="analyze" class="px-8 h-14 bg-echo-dark text-white font-bold rounded-2xl hover:bg-echo-green transition-all flex items-center gap-2">
+                                <i data-lucide="search" class="w-4 h-4"></i> 解析
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Song List with Prominent Download Button -->
+                    <div v-if="songs.length > 0" class="bg-white/50 rounded-[32px] overflow-hidden border border-echo-gray/10 shadow-sm animate-in fade-in slide-in-from-bottom-4">
+                        <!-- Action Bar -->
+                        <div class="px-8 py-6 border-b border-echo-gray/10 flex items-center justify-between bg-white/40">
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" v-model="allSelected" @change="selectAll" class="w-5 h-5 rounded border-echo-gray text-echo-green focus:ring-echo-green bg-white/50">
+                                <div>
+                                    <p class="text-xs font-bold text-echo-dark">全选所有歌曲</p>
+                                    <p class="text-[10px] text-echo-gray font-medium">已解析 {{ songs.length }} 个项目</p>
+                                </div>
+                            </label>
+
+                            <!-- Highlighted Download Button -->
+                            <button 
+                                @click="downloadSelected" 
+                                :disabled="selectedCount === 0"
+                                :class="[
+                                    'px-8 py-3 rounded-2xl flex items-center gap-3 transition-all font-bold text-sm btn-bounce shadow-lg',
+                                    selectedCount > 0 
+                                        ? 'bg-echo-orange text-white shadow-echo-orange/20 scale-100 selection-glow' 
+                                        : 'bg-echo-gray/30 text-echo-gray cursor-not-allowed scale-95 opacity-50'
+                                ]"
+                            >
+                                <i data-lucide="download-cloud" class="w-5 h-5"></i>
+                                下载选中项 {{ selectedCount > 0 ? `(${selectedCount})` : '' }}
+                            </button>
+                        </div>
+
+                        <!-- List Content -->
+                        <div class="divide-y divide-echo-gray/10 max-h-[500px] overflow-y-auto custom-scroll">
+                            <div v-for="song in songs" :key="song.id" class="px-8 py-5 flex items-center hover:bg-white/60 transition-colors group">
+                                <input type="checkbox" v-model="song.selected" class="w-5 h-5 rounded border-echo-gray text-echo-green mr-6 cursor-pointer">
+                                <div class="w-12 h-12 rounded-xl bg-echo-gray/20 mr-5 flex items-center justify-center shadow-inner">
+                                    <i data-lucide="music-2" class="w-6 h-6 text-echo-green/40"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-base font-bold text-echo-dark truncate">{{ song.title }}</p>
+                                    <p class="text-xs font-medium text-echo-gray uppercase tracking-wider">{{ song.artist }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-mono font-bold text-echo-dark/40 bg-echo-gray/10 px-3 py-1 rounded-full">{{ song.size }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Offline View -->
+                <div v-if="view === 'offline'" class="h-full flex flex-col">
+                    <div 
+                        @click="triggerFile"
+                        @dragover.prevent="dragging = true"
+                        @dragleave.prevent="dragging = false"
+                        @drop.prevent="handleDrop"
+                        :class="['flex-1 border-2 border-dashed rounded-[48px] flex flex-col items-center justify-center transition-all group', 
+                                dragging ? 'bg-echo-green/10 border-echo-green shadow-inner' : 'bg-white/40 border-echo-gray/40 hover:border-echo-green/60']"
+                    >
+                        <input type="file" ref="fileInput" class="hidden" multiple accept=".ncm" @change="handleFiles">
+                        <div :class="['w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-all shadow-sm', dragging ? 'bg-echo-green text-white scale-110' : 'bg-echo-bg text-echo-green group-hover:scale-105']">
+                            <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-echo-dark mb-2">批量 NCM 转换</h3>
+                        <p class="text-sm text-echo-gray text-center max-w-sm leading-relaxed">
+                            支持拖拽多个 .ncm 加密文件到此区域<br>
+                            我们将自动解密并还原为 <span class="font-bold text-echo-orange">MP3 / FLAC</span> 格式
+                        </p>
+                        <button class="mt-8 px-10 py-4 bg-echo-dark text-white text-sm font-bold rounded-2xl hover:bg-echo-green transition-all shadow-lg">
+                            浏览本地文件
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Footer Task Bar -->
+        <footer class="h-24 flex-shrink-0 px-12 border-t border-echo-gray/20 bg-white/60 backdrop-blur-sm flex items-center justify-between">
+            <div class="w-1/4 flex items-center gap-4">
+                <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center', tasks.length > 0 ? 'bg-echo-orange/10' : 'bg-echo-gray/10']">
+                    <i data-lucide="refresh-ccw" :class="['w-6 h-6', tasks.length > 0 ? 'text-echo-orange animate-spin' : 'text-echo-gray']"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-echo-dark">{{ tasks.length > 0 ? '任务处理中...' : '系统就绪' }}</p>
+                    <p class="text-[10px] font-bold text-echo-gray uppercase tracking-widest">{{ tasks.length }} 个任务待办</p>
+                </div>
+            </div>
+
+            <div class="flex-1 max-w-lg px-12">
+                <div v-if="tasks.length > 0">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-bold text-echo-green truncate max-w-[200px]">{{ tasks[0].name }}</span>
+                        <span class="text-[10px] font-mono text-echo-dark font-bold">{{ tasks[0].progress }}%</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-echo-gray/20 rounded-full overflow-hidden">
+                        <div class="h-full bg-echo-green transition-all duration-300" :style="{width: tasks[0].progress + '%'}"></div>
+                    </div>
+                </div>
+                <div v-else class="flex items-center justify-center gap-4 text-echo-gray/30 font-bold uppercase tracking-[0.2em] text-[10px]">
+                    <div class="h-px flex-1 bg-echo-gray/20"></div>
+                    Ready to Stream
+                    <div class="h-px flex-1 bg-echo-gray/20"></div>
+                </div>
+            </div>
+
+            <div class="w-1/4 flex justify-end gap-3">
+                <button class="px-6 py-2.5 rounded-xl border border-echo-gray/30 text-xs font-bold text-echo-dark hover:bg-white transition-all">
+                    清空列表
+                </button>
+                <button class="px-6 py-2.5 rounded-xl bg-echo-green text-white text-xs font-bold hover:bg-echo-dark transition-all shadow-lg shadow-echo-green/10">
+                    存储路径
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const view = ref('online');
+                const inputUrl = ref('');
+                const songs = ref([]);
+                const allSelected = ref(false);
+                const dragging = ref(false);
+                const fileInput = ref(null);
+                const tasks = ref([]);
+
+                const selectedCount = computed(() => songs.value.filter(s => s.selected).length);
+
+                const analyze = () => {
+                    if (!inputUrl.value) return;
+                    songs.value = [
+                        { id: 1, title: '平凡之路', artist: '朴树', size: '12.4 MB', selected: false },
+                        { id: 2, title: '那些花儿', artist: '朴树', size: '10.8 MB', selected: false },
+                        { id: 3, title: '白桦林', artist: '朴树', size: '9.2 MB', selected: false },
+                        { id: 4, title: '生如夏花', artist: '朴树', size: '11.5 MB', selected: false }
+                    ];
+                    setTimeout(() => lucide.createIcons(), 50);
+                };
+
+                const selectAll = () => {
+                    songs.value.forEach(s => s.selected = allSelected.value);
+                };
+
+                const triggerFile = () => fileInput.value.click();
+                
+                const handleFiles = (e) => {
+                    const files = Array.from(e.target.files);
+                    addTasks(files.map(f => f.name));
+                };
+
+                const handleDrop = (e) => {
+                    dragging.value = false;
+                    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.ncm'));
+                    addTasks(files.map(f => f.name));
+                };
+
+                const addTasks = (names) => {
+                    names.forEach(name => {
+                        const id = Math.random();
+                        const task = { id, name, progress: 0 };
+                        tasks.value.push(task);
+
+                        const interval = setInterval(() => {
+                            task.progress += Math.floor(Math.random() * 10);
+                            if (task.progress >= 100) {
+                                task.progress = 100;
+                                clearInterval(interval);
+                                setTimeout(() => {
+                                    tasks.value = tasks.value.filter(t => t.id !== id);
+                                }, 1500);
+                            }
+                        }, 300);
+                    });
+                };
+
+                const downloadSelected = () => {
+                    const selected = songs.value.filter(s => s.selected);
+                    if (selected.length === 0) return;
+                    addTasks(selected.map(s => s.title + '.mp3'));
+                    songs.value = []; 
+                    allSelected.value = false;
+                };
+
+                onMounted(() => {
+                    lucide.createIcons();
+                });
+
+                return {
+                    view,
+                    inputUrl,
+                    songs,
+                    allSelected,
+                    dragging,
+                    fileInput,
+                    tasks,
+                    selectedCount,
+                    analyze,
+                    selectAll,
+                    triggerFile,
+                    handleFiles,
+                    handleDrop,
+                    downloadSelected
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

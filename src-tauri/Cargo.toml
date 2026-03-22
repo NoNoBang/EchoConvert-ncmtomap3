@@ -10,10 +10,12 @@ rust-version = "1.70"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["shell-open"] }
+tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+regex = "1"
 
 # For NCM decryption
 aes = { version = "0.8", features = ["hazmat"] }
@@ -29,7 +31,7 @@ thiserror = "1.0"
 
 # For audio - using ffmpeg via C bindings would be complex
 # Instead we'll extract the raw audio and write it directly
-cpal = { version = "0.18", optional = true }
+cpal = { version = "0.17", optional = true }
 
 # Logging
 log = "0.4"
