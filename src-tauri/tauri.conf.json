@@ -1,7 +1,7 @@
 {
   "productName": "EchoConvert",
   "version": "1.0.0",
-  "identifier": "com.ncm2mp3.app",
+  "identifier": "com.nonobang.musicformatconversion",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
