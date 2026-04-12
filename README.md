@@ -5,7 +5,7 @@
 ## 📦 下载与发布
 
 - GitHub Releases 下载地址：
-  [https://github.com/NoNoBang/Music-Format-Conversion/releases](https://github.com/NoNoBang/Music-Format-Conversion/releases)
+  [https://github.com/NoNoBang/EchoConvert/releases](https://github.com/NoNoBang/EchoConvert/releases)
 - macOS 用户下载 `.dmg`（或 `.app.zip`）安装包。
 - Windows 用户下载 `.msi`（或 `.exe`）安装包。
 
