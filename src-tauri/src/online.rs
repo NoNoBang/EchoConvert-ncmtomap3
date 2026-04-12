@@ -27,6 +27,7 @@ pub struct PlaylistTrack {
     pub artist: String,
     pub album: String,
     pub cover_url: Option<String>,
+    pub file_type: String,
     pub duration_ms: u64,
     pub duration_label: String,
     pub size_bytes: u64,
@@ -49,6 +50,26 @@ pub struct DownloadItemResult {
     pub saved_path: Option<String>,
     pub status: String,
     pub message: String,
+}
+
+pub async fn download_track(track: DownloadTrackRequest) -> Result<DownloadItemResult> {
+    let save_dir = settings::effective_download_dir()?;
+    match download_single_track(&save_dir, &track).await {
+        Ok(saved_path) => Ok(DownloadItemResult {
+            id: track.id,
+            title: track.title,
+            saved_path: Some(saved_path),
+            status: "done".into(),
+            message: "下载完成".into(),
+        }),
+        Err(error) => Ok(DownloadItemResult {
+            id: track.id,
+            title: track.title,
+            saved_path: None,
+            status: "error".into(),
+            message: error.to_string(),
+        }),
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -291,7 +312,7 @@ fn format_duration(duration_ms: u64) -> String {
 }
 
 fn map_track(item: &serde_json::Value) -> PlaylistTrack {
-    let duration_ms = item.get("dt").and_then(|value| value.as_u64()).unwrap_or(0);
+    let duration_ms = extract_duration_ms(item);
     let size_bytes = extract_track_size(item);
 
     PlaylistTrack {
@@ -307,6 +328,7 @@ fn map_track(item: &serde_json::Value) -> PlaylistTrack {
         artist: extract_artist(item),
         album: extract_album(item),
         cover_url: extract_cover_url(item),
+        file_type: detect_file_type(item).to_string(),
         duration_ms,
         duration_label: format_duration(duration_ms),
         size_bytes,
@@ -358,6 +380,53 @@ fn extract_track_size(item: &serde_json::Value) -> u64 {
         }
     }
     0
+}
+
+fn detect_file_type(item: &serde_json::Value) -> &'static str {
+    if item.get("hr").is_some() || item.get("sq").is_some() {
+        "FLAC"
+    } else if item.get("h").is_some() || item.get("m").is_some() || item.get("l").is_some() {
+        "MP3"
+    } else if item
+        .get("rtUrls")
+        .and_then(|value| value.as_array())
+        .map(|urls| !urls.is_empty())
+        .unwrap_or(false)
+    {
+        "MP3"
+    } else {
+        // Fallback: Netease song detail often omits explicit format fields.
+        // For normal online playlist tracks, MP3 is the safest default.
+        "MP3"
+    }
+}
+
+fn extract_duration_ms(item: &serde_json::Value) -> u64 {
+    item.get("dt")
+        .and_then(|value| {
+            value
+                .as_u64()
+                .map(normalize_duration_value)
+                .or_else(|| value.as_i64().map(|v| normalize_duration_value(v.max(0) as u64)))
+        })
+        .or_else(|| {
+            item.get("duration")
+                .and_then(|value| {
+                    value
+                        .as_u64()
+                        .map(normalize_duration_value)
+                        .or_else(|| value.as_i64().map(|v| normalize_duration_value(v.max(0) as u64)))
+                })
+        })
+        .unwrap_or(0)
+}
+
+fn normalize_duration_value(value: u64) -> u64 {
+    if value > 0 && value < 1000 {
+        value.saturating_mul(1000)
+    } else {
+        value
+    }
 }
 
 fn format_size(size_bytes: u64) -> String {

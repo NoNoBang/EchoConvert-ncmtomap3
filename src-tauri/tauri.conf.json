@@ -1,5 +1,5 @@
 {
-  "productName": "ncm2mp3",
+  "productName": "EchoConvert",
   "version": "1.0.0",
   "identifier": "com.ncm2mp3.app",
   "build": {
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "NCM to MP3 Converter",
+        "title": "EchoConvert",
         "width": 900,
         "height": 700,
         "resizable": true,

@@ -1,521 +1,429 @@
 <template>
-  <div class="app-shell">
-    <input
-      ref="fileInput"
-      type="file"
-      multiple
-      accept=".ncm"
-      class="hidden-input"
-      @change="handleFileSelect"
-    />
-    <input
-      ref="folderInput"
-      type="file"
-      webkitdirectory
-      class="hidden-input"
-      @change="handleFileSelect"
-    />
+  <div class="quark-app">
+    <aside class="sidebar">
+      <div class="sidebar-title">EchoConvert</div>
 
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">
-          <span></span>
-        </div>
-        <div class="brand-copy">
-          <h1>EchoConvert</h1>
-          <p>回声转换</p>
-        </div>
-      </div>
-
-      <nav class="nav-tabs" aria-label="view switch">
+      <nav class="side-nav">
         <button
           type="button"
-          :class="['nav-tab', { active: view === 'online' }]"
-          @click="view = 'online'"
+          class="side-item"
+          :class="{ active: activeNav === 'home' }"
+          @click="activeNav = 'home'"
         >
-          在线歌单
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 11.5L12 4l9 7.5"></path>
+            <path d="M6.5 10.5V20h11V10.5"></path>
+          </svg>
+          <span>主页</span>
         </button>
+
         <button
           type="button"
-          :class="['nav-tab', { active: view === 'offline' }]"
-          @click="view = 'offline'"
+          class="side-item"
+          :class="{ active: activeNav === 'transfer' }"
+          @click="openTransfer('downloading')"
         >
-          本地转换
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 4v10"></path>
+            <path d="M8 10.5L12 14.5l4-4"></path>
+            <path d="M4 19h16"></path>
+          </svg>
+          <span>传输</span>
+          <span v-if="runningTasks.length" class="side-badge">{{ runningTasks.length }}</span>
         </button>
       </nav>
+    </aside>
 
-      <div class="topbar-actions">
-        <button type="button" class="icon-btn" @click="chooseDownloadDirectory" title="设置存储路径">
-          <span class="icon folder"></span>
-        </button>
-        <button type="button" class="icon-btn" @click="pushInfoLog" title="显示说明">
-          <span class="icon info"></span>
-        </button>
-      </div>
-    </header>
+    <main class="main-view">
+      <section v-if="activeNav === 'home'" class="home-view">
+        <div class="search-wrapper" :class="parsedOnce ? 'search-collapsed' : 'search-initial'">
+          <div v-if="!parsedOnce" class="welcome">
+            <h1>你好，我是歌单助手</h1>
+            <p>粘贴链接，一键获取您的云端乐库</p>
+          </div>
 
-    <main class="content">
-      <div class="content-inner">
-        <section v-if="view === 'online'" class="online-view">
-          <article class="glass-panel hero-card">
-            <h2>解析在线歌单</h2>
-            <p class="subtext">
-              输入网易云音乐歌单链接或歌单 ID，解析后可批量勾选并下载到当前存储目录。
-            </p>
-
-            <div class="playlist-form">
-              <div class="input-shell">
-                <span class="icon link"></span>
-                <input
-                  v-model="inputUrl"
-                  type="text"
-                  placeholder="粘贴歌单链接或 ID..."
-                  @keydown.enter.prevent="analyzePlaylist"
-                />
-              </div>
-              <button type="button" class="dark-btn" :disabled="playlistLoading" @click="analyzePlaylist">
-                {{ playlistLoading ? '解析中...' : '解析' }}
-              </button>
+          <div class="search-box">
+            <div class="search-input-row">
+              <input
+                v-model="inputUrl"
+                type="text"
+                placeholder="在此输入歌单网址..."
+                @keydown.enter.prevent="parsePlaylist"
+              />
             </div>
 
-            <div class="playlist-summary" v-if="playlistMeta">
-              <div>
-                <strong>{{ playlistMeta.title }}</strong>
-                <span>创建者：{{ playlistMeta.creator }}</span>
-              </div>
-              <div>
-                <strong>{{ playlistMeta.trackCount }}</strong>
-                <span>已解析歌曲</span>
-              </div>
-              <div>
-                <strong>{{ downloadDirName }}</strong>
-                <span>下载目录</span>
+            <div class="search-action-row">
+              <div class="auto-tag">自动识别</div>
+              <div class="action-buttons">
+                <button type="button" class="line-btn" @click="chooseDownloadDirectory">下载目录</button>
+                <button type="button" class="primary-btn" :disabled="playlistLoading" @click="parsePlaylist">
+                  {{ playlistLoading ? "正在解析..." : "开始解析" }}
+                </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div v-if="playlistMeta?.coverUrl" class="playlist-cover-strip">
-              <img :src="playlistMeta.coverUrl" :alt="playlistMeta.title" class="playlist-cover" />
-              <div>
-                <strong>{{ playlistMeta.title }}</strong>
-                <span>{{ playlistMeta.creator }}</span>
-              </div>
+        <div v-if="songs.length" class="result-area">
+          <div class="result-header">
+            <div class="result-meta">
+              <h2>解析结果</h2>
+              <span>已选择 {{ selectedCount }} 项</span>
             </div>
-          </article>
+            <button type="button" class="primary-btn" :disabled="!selectedCount" @click="downloadSelectedSongs">
+              批量下载
+            </button>
+          </div>
 
-          <article v-if="songs.length" class="song-panel">
-            <div class="song-toolbar">
-              <label class="check-all">
-                <input v-model="allSelected" type="checkbox" @change="selectAllSongs" />
-                <div>
-                  <strong>全选所有歌曲</strong>
-                  <span>已解析 {{ songs.length }} 个项目</span>
-                </div>
-              </label>
+          <div class="result-table-wrap custom-scroll">
+            <table class="result-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      :checked="masterChecked"
+                      :indeterminate.prop="!masterChecked && selectedCount > 0"
+                      @change="toggleAllSongs($event.target.checked)"
+                    />
+                  </th>
+                  <th>文件名</th>
+                  <th>作者</th>
+                  <th>类型</th>
+                  <th>大小</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="song in songs" :key="song.id">
+                  <td>
+                    <input type="checkbox" v-model="song.selected" @change="syncMasterCheckbox" />
+                  </td>
+                  <td class="file-cell">
+                    <img v-if="song.coverUrl" :src="song.coverUrl" :alt="song.title" class="song-thumb" />
+                    <div v-else class="song-thumb placeholder">N</div>
+                    <div>
+                      <div class="song-title">{{ song.title }}</div>
+                      <div class="song-sub">{{ song.album }} · {{ song.durationLabel }}</div>
+                    </div>
+                  </td>
+                  <td>{{ song.artist }}</td>
+                  <td>{{ song.fileType || "Unknown" }}</td>
+                  <td>{{ song.sizeLabel }}</td>
+                  <td>
+                    <button type="button" class="icon-btn" @click="downloadSingleSong(song)">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 4v10"></path>
+                        <path d="M8 10.5L12 14.5l4-4"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
+      <section v-else class="transfer-view">
+        <div class="transfer-header">
+          <div class="transfer-title-wrap">
+            <h2>传输</h2>
+            <div class="tabs">
               <button
                 type="button"
-                class="accent-btn"
-                :disabled="selectedCount === 0 || onlineDownloading"
-                @click="downloadSelected"
+                class="tab-btn"
+                :class="{ active: transferTab === 'downloading' }"
+                @click="transferTab = 'downloading'"
               >
-                {{ onlineDownloading ? '下载中...' : `下载选中项${selectedCount ? ` (${selectedCount})` : ''}` }}
+                正在下载 <span>{{ runningTasks.length }}</span>
+              </button>
+              <button
+                type="button"
+                class="tab-btn"
+                :class="{ active: transferTab === 'completed' }"
+                @click="transferTab = 'completed'"
+              >
+                已完成 <span>{{ completedTasks.length }}</span>
               </button>
             </div>
-
-            <div class="song-list custom-scroll">
-              <article v-for="song in songs" :key="song.id" class="song-row">
-                <input v-model="song.selected" type="checkbox" />
-                <img
-                  v-if="song.coverUrl"
-                  :src="song.coverUrl"
-                  :alt="song.title"
-                  class="song-cover"
-                />
-                <div v-else class="song-avatar">
-                  <span class="icon music"></span>
-                </div>
-                <div class="song-meta">
-                  <strong>{{ song.title }}</strong>
-                  <span>{{ song.artist }}</span>
-                  <span class="song-submeta">{{ song.album }} · {{ song.durationLabel }}</span>
-                </div>
-                <span class="song-size">{{ song.sizeLabel }}</span>
-              </article>
-            </div>
-          </article>
-        </section>
-
-        <section v-else class="offline-view">
-          <article
-            class="drop-panel"
-            :class="{ dragging: isDragging }"
-            @click="selectFiles"
-            @dragover.prevent="isDragging = true"
-            @dragleave.prevent="isDragging = false"
-            @drop.prevent="handleDrop"
-          >
-            <div class="upload-orb">
-              <span class="icon upload"></span>
-            </div>
-            <h2>批量 NCM 转换</h2>
-            <p>
-              支持拖拽多个 `.ncm` 文件到此区域，应用会自动解密并输出为
-              <strong>MP3 / FLAC</strong>。
-            </p>
-            <button type="button" class="dark-btn" @click.stop="selectFiles">
-              浏览本地文件
-            </button>
-          </article>
-
-          <div class="offline-grid">
-            <article class="glass-panel queue-panel">
-              <div class="section-head">
-                <div>
-                  <h3>转换队列</h3>
-                  <p>{{ files.length ? `已导入 ${files.length} 个文件` : '等待导入文件' }}</p>
-                </div>
-                <button
-                  type="button"
-                  class="outline-btn"
-                  :disabled="!files.length || isConverting"
-                  @click="startConversion"
-                >
-                  {{ isConverting ? `转换中 ${progress}%` : '开始转换' }}
-                </button>
-              </div>
-
-              <div class="progress-line">
-                <div class="progress-value" :style="{ width: `${progress}%` }"></div>
-              </div>
-
-              <div v-if="files.length" class="queue-list custom-scroll">
-                <article v-for="file in files" :key="file.path" class="queue-row">
-                  <div class="queue-meta">
-                    <strong>{{ file.name }}</strong>
-                    <span>{{ file.path }}</span>
-                  </div>
-                  <span class="queue-state" :class="file.status">{{ statusMap[file.status] }}</span>
-                </article>
-              </div>
-
-              <div v-else class="empty-panel">
-                队列为空，点击上方区域或直接拖拽 `.ncm` 文件开始。
-              </div>
-            </article>
-
-            <article class="glass-panel log-panel">
-              <div class="section-head">
-                <div>
-                  <h3>运行日志</h3>
-                  <p>展示当前导入、下载与转换过程</p>
-                </div>
-                <button type="button" class="outline-btn" :disabled="!logs.length" @click="clearLogs">
-                  清空日志
-                </button>
-              </div>
-
-              <div v-if="logs.length" class="log-list custom-scroll">
-                <article v-for="(log, index) in logs" :key="`${index}-${log.message}`" class="log-row">
-                  <span class="log-badge" :class="log.type">{{ log.type }}</span>
-                  <p>{{ log.message }}</p>
-                </article>
-              </div>
-
-              <div v-else class="empty-panel compact">
-                当前还没有日志输出。
-              </div>
-            </article>
           </div>
-        </section>
-      </div>
+          <button type="button" class="ghost-btn" @click="clearCompleted">清空全部记录</button>
+        </div>
+
+        <div class="transfer-list custom-scroll">
+          <div v-if="transferTab === 'downloading'">
+            <article v-for="task in runningTasks" :key="task.id" class="task-card">
+              <div class="task-row">
+                <div>
+                  <strong>{{ task.title }}</strong>
+                  <p>{{ task.artist }} · {{ task.type }}</p>
+                </div>
+                <div class="task-progress-side">
+                  <span>{{ task.progress }}%</span>
+                  <div class="mini-track">
+                    <div class="mini-value" :style="{ width: `${task.progress}%` }"></div>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <div v-if="!runningTasks.length" class="empty">暂无进行中的任务</div>
+          </div>
+
+          <div v-else>
+            <article
+              v-for="task in completedTasks"
+              :key="task.id"
+              class="history-row"
+              :class="{ 'open-ok': task.folderFeedback === 'ok', 'open-error': task.folderFeedback === 'error' }"
+            >
+              <div class="history-main">
+                <strong>{{ task.title }}</strong>
+                <p>{{ task.artist }} · {{ task.type }} · {{ task.sizeLabel }}</p>
+                <details class="history-detail">
+                  <summary>查看详情</summary>
+                  <p class="history-time">{{ task.completedAt || task.createdAt }}</p>
+                  <p v-if="task.savedPath" class="history-path">{{ task.savedPath }}</p>
+                  <p v-if="task.error" class="history-error">{{ task.error }}</p>
+                </details>
+              </div>
+              <div class="history-actions">
+                <button
+                  v-if="task.savedPath"
+                  type="button"
+                  class="folder-btn"
+                  data-tip="打开保存文件夹"
+                  @click="openSavedFolder(task)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <path d="M3 9V7a2 2 0 0 1 2-2h4"></path>
+                  </svg>
+                </button>
+                <span v-if="task.folderFeedback === 'ok'" class="folder-feedback ok">已打开</span>
+                <span v-if="task.folderFeedback === 'error'" class="folder-feedback error">打开失败</span>
+                <span class="history-status" :class="task.status">{{ task.status }}</span>
+              </div>
+            </article>
+            <div v-if="!completedTasks.length" class="empty">暂无历史记录</div>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <footer class="taskbar">
-      <div class="taskbar-side">
-        <div class="task-icon" :class="{ active: activeTask }">
-          <span class="icon refresh" :class="{ spinning: activeTask }"></span>
-        </div>
-        <div class="task-copy">
-          <strong>{{ activeTask ? '任务处理中...' : '系统就绪' }}</strong>
-          <span>{{ taskCount }} 个任务待办</span>
-        </div>
-      </div>
-
-      <div class="taskbar-center">
-        <template v-if="activeTask">
-          <div class="taskbar-progress-head">
-            <span>{{ activeTask.name }}</span>
-            <strong>{{ activeTask.progress }}%</strong>
-          </div>
-          <div class="taskbar-progress">
-            <div class="taskbar-progress-value" :style="{ width: `${activeTask.progress}%` }"></div>
-          </div>
-        </template>
-        <div v-else class="taskbar-empty">
-          <span></span>
-          <p>{{ downloadDir }}</p>
-          <span></span>
-        </div>
-      </div>
-
-      <div class="taskbar-actions">
-        <button type="button" class="outline-btn" @click="clearFiles">清空列表</button>
-        <button type="button" class="green-btn" @click="chooseDownloadDirectory">存储路径</button>
-      </div>
-    </footer>
+    <div class="toast" :class="{ show: !!toastText }">{{ toastText }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { computed, onMounted, ref } from "vue"
+import { invoke } from "@tauri-apps/api/core"
 
-const view = ref('offline')
-const inputUrl = ref('')
-const playlistMeta = ref(null)
-const songs = ref([])
-const allSelected = ref(false)
+const activeNav = ref("home")
+const transferTab = ref("downloading")
+const inputUrl = ref("")
+const parsedOnce = ref(false)
 const playlistLoading = ref(false)
-const onlineDownloading = ref(false)
+const songs = ref([])
+const masterChecked = ref(false)
 
-const files = ref([])
-const logs = ref([])
+const downloadDir = ref("")
 const tasks = ref([])
-const isDragging = ref(false)
-const isConverting = ref(false)
-const progress = ref(0)
-const downloadDir = ref('')
-const fileInput = ref(null)
-const folderInput = ref(null)
+const downloadQueue = ref([])
+const queueWorkerRunning = ref(false)
 
-const statusMap = {
-  pending: '待处理',
-  processing: '处理中',
-  done: '完成',
-  error: '失败',
-}
+const toastText = ref("")
+let toastTimer = null
 
 const selectedCount = computed(() => songs.value.filter((song) => song.selected).length)
-const activeTask = computed(() => tasks.value[0] || null)
-const taskCount = computed(() => tasks.value.length)
-const downloadDirName = computed(() => {
-  if (!downloadDir.value) return '未设置'
-  const segments = downloadDir.value.split(/[\\/]/).filter(Boolean)
-  return segments.at(-1) || downloadDir.value
-})
+const runningTasks = computed(() =>
+  tasks.value.filter((task) => task.status === "queued" || task.status === "running"),
+)
+const completedTasks = computed(() =>
+  tasks.value
+    .filter((task) => task.status === "done" || task.status === "error")
+    .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt)),
+)
 
-function addLog(message, type = 'info') {
-  logs.value.unshift({ message, type })
-  logs.value = logs.value.slice(0, 80)
+function nowLabel() {
+  return new Date().toLocaleString("zh-CN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
-function normalizeFile(file) {
-  const rawPath = file.path || file.webkitRelativePath || file.name
-  return {
-    name: file.name,
-    path: rawPath,
-    status: 'pending',
-  }
+function showToast(text) {
+  toastText.value = text
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastText.value = ""
+  }, 2400)
 }
 
-function pushFiles(fileList) {
-  const incoming = Array.from(fileList || [])
-    .filter((file) => file.name.toLowerCase().endsWith('.ncm'))
-    .map(normalizeFile)
-
-  if (!incoming.length) {
-    addLog('未检测到可导入的 .ncm 文件。', 'warn')
-    return
-  }
-
-  let added = 0
-
-  for (const file of incoming) {
-    if (!files.value.some((item) => item.path === file.path)) {
-      files.value.push(file)
-      added += 1
-    }
-  }
-
-  addLog(`已加入 ${added} 个文件到转换队列。`, 'info')
+function openTransfer(tab = "downloading") {
+  activeNav.value = "transfer"
+  transferTab.value = tab
 }
 
-function createTask(name, initialProgress = 0) {
+function createTask(payload) {
   const task = {
     id: `${Date.now()}-${Math.random()}`,
-    name,
-    progress: initialProgress,
+    status: "queued",
+    progress: 0,
+    createdAt: nowLabel(),
+    completedAt: "",
+    savedPath: "",
+    error: "",
+    ...payload,
   }
-
-  tasks.value.push(task)
+  tasks.value.unshift(task)
   return task
 }
 
-function settleTask(task, finalProgress = 100) {
-  task.progress = finalProgress
-  window.setTimeout(() => {
-    tasks.value = tasks.value.filter((item) => item.id !== task.id)
-  }, 1200)
+function updateTask(id, patch) {
+  const target = tasks.value.find((item) => item.id === id)
+  if (!target) return
+  Object.assign(target, patch)
 }
 
 async function loadSettings() {
   try {
-    const settings = await invoke('get_app_settings')
-    downloadDir.value = settings.downloadDir || ''
+    const settings = await invoke("get_app_settings")
+    downloadDir.value = settings.downloadDir || ""
   } catch (error) {
-    addLog(`读取设置失败：${String(error)}`, 'error')
+    showToast(`读取设置失败: ${String(error)}`)
   }
-}
-
-function handleFileSelect(event) {
-  pushFiles(event.target.files)
-  event.target.value = ''
-}
-
-function handleDrop(event) {
-  isDragging.value = false
-  pushFiles(event.dataTransfer?.files)
-}
-
-function selectFiles() {
-  fileInput.value?.click()
-}
-
-function selectFolder() {
-  folderInput.value?.click()
-}
-
-function clearLogs() {
-  logs.value = []
-}
-
-function clearFiles() {
-  if (isConverting.value) return
-  files.value = []
-  progress.value = 0
-  addLog('已清空待转换列表。', 'info')
-}
-
-function pushInfoLog() {
-  addLog(`当前在线下载目录：${downloadDir.value || '未设置'}`, 'info')
-  addLog('本地转换会在源文件目录输出解密后的音频文件。', 'info')
 }
 
 async function chooseDownloadDirectory() {
-  const next = window.prompt('请输入在线下载保存路径', downloadDir.value || '')
+  const next = window.prompt("请输入在线下载保存路径", downloadDir.value || "")
   if (!next) return
-
   try {
-    const settings = await invoke('set_download_directory', { path: next })
+    const settings = await invoke("set_download_directory", { path: next })
     downloadDir.value = settings.downloadDir || next
-    addLog(`已更新下载目录：${downloadDir.value}`, 'success')
+    showToast("存储路径已更新")
   } catch (error) {
-    addLog(`设置下载目录失败：${String(error)}`, 'error')
+    showToast(`设置失败: ${String(error)}`)
   }
 }
 
-async function analyzePlaylist() {
+async function parsePlaylist() {
   if (!inputUrl.value.trim()) {
-    addLog('请输入歌单链接或 ID。', 'warn')
+    showToast("请输入歌单链接")
     return
   }
-
   playlistLoading.value = true
-  const task = createTask('解析在线歌单', 12)
-
   try {
-    const result = await invoke('analyze_online_playlist', { query: inputUrl.value.trim() })
-    task.progress = 100
-    playlistMeta.value = result
-    songs.value = result.tracks.map((song) => ({ ...song, selected: false }))
-    allSelected.value = false
-    addLog(`歌单解析完成：${result.title}，共 ${result.trackCount} 首。`, 'success')
+    const result = await invoke("analyze_online_playlist", { query: inputUrl.value.trim() })
+    songs.value = (result.tracks || []).map((song) => ({ ...song, selected: false }))
+    masterChecked.value = false
+    parsedOnce.value = true
+    showToast(`解析完成，共 ${songs.value.length} 首`)
   } catch (error) {
-    task.progress = 100
-    addLog(`歌单解析失败：${String(error)}`, 'error')
+    showToast(`解析失败: ${String(error)}`)
   } finally {
     playlistLoading.value = false
-    settleTask(task)
   }
 }
 
-function selectAllSongs() {
-  for (const song of songs.value) {
-    song.selected = allSelected.value
-  }
+function syncMasterCheckbox() {
+  const total = songs.value.length
+  const selected = selectedCount.value
+  masterChecked.value = total > 0 && selected === total
 }
 
-async function downloadSelected() {
+function toggleAllSongs(checked) {
+  songs.value = songs.value.map((song) => ({ ...song, selected: checked }))
+  masterChecked.value = checked
+}
+
+function enqueueDownloadTask(song) {
+  const task = createTask({
+    kind: "online_download",
+    title: song.title,
+    artist: song.artist || "未知歌手",
+    type: song.fileType || "Unknown",
+    sizeLabel: song.sizeLabel || "未知大小",
+    sourceSongId: song.id,
+  })
+  downloadQueue.value.push({
+    taskId: task.id,
+    track: { id: song.id, title: song.title, artist: song.artist || "未知歌手" },
+  })
+}
+
+function downloadSingleSong(song) {
+  enqueueDownloadTask(song)
+  processDownloadQueue()
+  showToast(`已加入下载队列: ${song.title}`)
+  openTransfer("downloading")
+}
+
+function downloadSelectedSongs() {
   const selected = songs.value.filter((song) => song.selected)
-  if (!selected.length || onlineDownloading.value) return
+  if (!selected.length) return
+  for (const song of selected) enqueueDownloadTask(song)
+  songs.value = songs.value.map((song) => ({ ...song, selected: false }))
+  masterChecked.value = false
+  processDownloadQueue()
+  showToast(`已加入 ${selected.length} 首到下载队列`)
+  openTransfer("downloading")
+}
 
-  onlineDownloading.value = true
-  const task = createTask(`在线下载 ${selected.length} 首`, 8)
-  addLog(`开始下载 ${selected.length} 首歌曲到 ${downloadDir.value || '默认目录'}。`, 'info')
-
+async function processDownloadQueue() {
+  if (queueWorkerRunning.value) return
+  queueWorkerRunning.value = true
   try {
-    task.progress = 35
-    const result = await invoke('download_online_tracks', {
-      tracks: selected.map((song) => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist,
-      })),
-    })
-    task.progress = 100
-    addLog(`在线下载完成：成功 ${result.successCount} 首，失败 ${result.failureCount} 首。`, 'success')
-
-    for (const item of result.items) {
-      addLog(`${item.title}：${item.message}${item.savedPath ? ` -> ${item.savedPath}` : ''}`, item.status === 'done' ? 'success' : 'error')
+    while (downloadQueue.value.length) {
+      const item = downloadQueue.value.shift()
+      if (!item) continue
+      updateTask(item.taskId, { status: "running", progress: 20 })
+      const result = await invoke("download_online_track", { track: item.track })
+      if (result.status === "done") {
+        updateTask(item.taskId, {
+          status: "done",
+          progress: 100,
+          completedAt: nowLabel(),
+          savedPath: result.savedPath || "",
+        })
+      } else {
+        updateTask(item.taskId, {
+          status: "error",
+          progress: 100,
+          completedAt: nowLabel(),
+          error: result.message || "下载失败",
+        })
+      }
     }
   } catch (error) {
-    task.progress = 100
-    addLog(`在线下载失败：${String(error)}`, 'error')
+    showToast(`下载队列中断: ${String(error)}`)
   } finally {
-    onlineDownloading.value = false
-    settleTask(task)
+    queueWorkerRunning.value = false
   }
 }
 
-async function startConversion() {
-  if (!files.value.length || isConverting.value) return
+function clearCompleted() {
+  tasks.value = tasks.value.filter((task) => task.status === "queued" || task.status === "running")
+  showToast("已清空已完成记录")
+}
 
-  isConverting.value = true
-  progress.value = 8
-  files.value = files.value.map((file) => ({ ...file, status: 'processing' }))
-  const conversionTask = createTask(`本地转换 ${files.value.length} 项`, 8)
-  addLog(`开始处理 ${files.value.length} 个文件。`, 'info')
-
-  const paths = files.value.map((file) => file.path)
-
+async function openSavedFolder(taskRef) {
+  const target = tasks.value.find((task) => task.id === taskRef.id)
+  if (!target) return
   try {
-    conversionTask.progress = 45
-    const result = await invoke('convert_ncm_files', { files: paths })
-    progress.value = 100
-    conversionTask.progress = 100
-
-    const resultByPath = new Map(result.items.map((item) => [item.sourcePath, item]))
-    files.value = files.value.map((file) => {
-      const item = resultByPath.get(file.path)
-      return {
-        ...file,
-        status: item?.status || 'error',
-      }
-    })
-
-    addLog(`本地转换完成：成功 ${result.successCount} 个，失败 ${result.failureCount} 个。`, result.failureCount ? 'warn' : 'success')
-
-    for (const item of result.items) {
-      addLog(`${item.sourcePath}：${item.message}${item.outputPath ? ` -> ${item.outputPath}` : ''}`, item.status === 'done' ? 'success' : 'error')
-    }
+    await invoke("open_saved_folder", { savedPath: taskRef.savedPath })
+    target.folderFeedback = "ok"
   } catch (error) {
-    progress.value = 100
-    conversionTask.progress = 100
-    files.value = files.value.map((file) => ({ ...file, status: 'error' }))
-    addLog(`本地转换失败：${String(error)}`, 'error')
+    target.folderFeedback = "error"
+    showToast(`打开失败: ${String(error)}`)
   } finally {
-    isConverting.value = false
-    settleTask(conversionTask, 100)
+    window.setTimeout(() => {
+      target.folderFeedback = ""
+    }, 1600)
   }
 }
 
@@ -525,904 +433,653 @@ onMounted(() => {
 </script>
 
 <style scoped>
-:global(*) {
-  box-sizing: border-box;
-}
-
+:global(*) { box-sizing: border-box; }
 :global(body) {
   margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: #e8e2d8;
-  color: #4a5553;
-  font-family: "Noto Sans SC", "PingFang SC", "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #fff;
+  color: #1a1a1a;
 }
 
-:global(button),
-:global(input) {
-  font: inherit;
-}
-
-#app,
-.app-shell {
+.quark-app {
+  --blue: #3267ff;
+  display: flex;
   min-height: 100vh;
 }
 
-.app-shell {
+.sidebar {
+  width: 86px;
+  border-right: 1px solid #eef1f6;
+  background: #fff;
+  padding: 16px 10px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.topbar {
-  height: 80px;
-  display: flex;
-  flex: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 48px;
-  background: rgba(255, 255, 255, 0.3);
-  border-bottom: 1px solid rgba(191, 198, 196, 0.2);
 }
 
-.brand {
+.sidebar-title {
+  font-size: 11px;
+  color: #9ca4b6;
+  margin-bottom: 18px;
+}
+
+.side-nav {
+  width: 100%;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.side-item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #7d8493;
+  border-radius: 12px;
+  padding: 10px 0 8px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.side-item svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.side-item.active {
+  color: var(--blue);
+  background: #edf2ff;
+  border-color: #d9e4ff;
+  box-shadow: 0 6px 16px rgba(50, 103, 255, 0.14);
+}
+
+.side-item span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.side-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  padding: 0 3px;
+}
+
+.main-view {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-view {
+  min-height: 100vh;
+  padding: 22px 30px;
+}
+
+.search-wrapper {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-initial { transform: translateY(18vh); }
+.search-collapsed { transform: translateY(0); margin-bottom: 18px; max-width: 100%; }
+
+.welcome {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.welcome h1 {
+  margin: 0;
+  font-size: clamp(24px, 5vw, 36px);
+}
+
+.welcome p {
+  margin: 10px 0 0;
+  color: #8a90a0;
+}
+
+.search-box {
+  border: 1px solid #edf0f6;
+  border-radius: 24px;
+  box-shadow: 0 6px 24px rgba(20, 28, 45, 0.06);
+  background: #fff;
+  padding: 8px;
+}
+
+.search-input-row input {
+  border: 0;
+  outline: none;
+  width: 100%;
+  font-size: 17px;
+  padding: 14px 14px 12px;
+}
+
+.search-action-row {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding: 4px 6px 2px;
 }
 
-.brand-mark {
-  width: 40px;
-  height: 40px;
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auto-tag {
+  background: #eef3ff;
+  color: var(--blue);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 11px;
+}
+
+.primary-btn,
+.line-btn,
+.ghost-btn {
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-btn {
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  padding: 10px 14px;
+}
+
+.primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.line-btn {
+  border: 1px solid #d9e4ff;
+  background: #f8faff;
+  color: var(--blue);
+  padding: 9px 12px;
+}
+
+.result-area {
+  margin-top: 14px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.result-meta h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.result-meta span {
+  color: #8a90a0;
+  font-size: 12px;
+}
+
+.result-table-wrap {
+  border: 1px solid #edf0f6;
+  border-radius: 16px;
+  overflow: auto;
+  max-height: min(60vh, 620px);
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.result-table th,
+.result-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f4f6fa;
+  text-align: left;
+  font-size: 14px;
+}
+
+.result-table th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  color: #8a90a0;
+  font-size: 11px;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.file-cell {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 220px;
+}
+
+.song-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+}
+
+.song-thumb.placeholder {
+  background: #eef3ff;
+  color: var(--blue);
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: #6f8f72;
-}
-
-.brand-mark span,
-.icon {
-  display: inline-block;
-  position: relative;
-}
-
-.brand-mark span {
-  width: 20px;
-  height: 20px;
-}
-
-.brand-mark span::before,
-.brand-mark span::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px solid #fff;
-  border-color: #fff transparent transparent transparent;
-  border-radius: 50%;
-}
-
-.brand-mark span::after {
-  inset: 5px 0 0;
-}
-
-.brand-copy h1,
-.brand-copy p {
-  margin: 0;
-  line-height: 1;
-}
-
-.brand-copy h1 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #4a5553;
-}
-
-.brand-copy p {
-  margin-top: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.35em;
-  text-transform: uppercase;
-  color: rgba(111, 143, 114, 0.68);
-}
-
-.nav-tabs {
-  display: flex;
-  gap: 56px;
-}
-
-.nav-tab {
-  position: relative;
-  border: 0;
-  background: transparent;
-  color: #bfc6c4;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.nav-tab.active {
-  color: #6f8f72;
+  font-size: 11px;
   font-weight: 700;
 }
 
-.nav-tab.active::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -12px;
-  width: 20px;
-  height: 3px;
-  background: #6f8f72;
-  border-radius: 99px;
-  transform: translateX(-50%);
+.song-title {
+  font-weight: 600;
 }
 
-.topbar-actions {
-  display: flex;
-  gap: 18px;
-}
-
-.icon-btn,
-.dark-btn,
-.outline-btn,
-.accent-btn,
-.green-btn {
-  border: 0;
-  cursor: pointer;
-  transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease;
-}
-
-.icon-btn:hover,
-.dark-btn:hover,
-.outline-btn:hover,
-.accent-btn:hover,
-.green-btn:hover {
-  transform: translateY(-1px);
+.song-sub {
+  margin-top: 2px;
+  color: #8a90a0;
+  font-size: 12px;
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: #bfc6c4;
-}
-
-.content {
-  flex: 1;
-  overflow: auto;
-  padding: 48px;
-}
-
-.content-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-.online-view,
-.offline-view {
-  min-height: 100%;
-}
-
-.glass-panel,
-.song-panel {
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(191, 198, 196, 0.3);
-  box-shadow: 0 10px 30px rgba(74, 85, 83, 0.06);
-}
-
-.hero-card {
-  padding: 40px;
-  border-radius: 32px;
-}
-
-.hero-card h2,
-.drop-panel h2,
-.section-head h3 {
-  margin: 0 0 10px;
-  color: #4a5553;
-}
-
-.hero-card h2,
-.drop-panel h2 {
-  font-size: 32px;
-}
-
-.subtext,
-.drop-panel p,
-.section-head p,
-.queue-meta span,
-.song-meta span,
-.task-copy span {
-  margin: 0;
-  color: #8f9996;
-  line-height: 1.7;
-}
-
-.playlist-form {
-  display: flex;
-  gap: 16px;
-  margin-top: 28px;
-}
-
-.playlist-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 22px;
-}
-
-.playlist-summary > div {
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.playlist-summary strong,
-.task-copy strong {
-  display: block;
-  color: #4a5553;
-}
-
-.playlist-summary span {
-  display: block;
-  margin-top: 6px;
-  color: #8f9996;
-  font-size: 12px;
-}
-
-.playlist-cover-strip {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 18px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.26);
-}
-
-.playlist-cover {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 16px;
-  flex: none;
-  box-shadow: 0 8px 18px rgba(74, 85, 83, 0.08);
-}
-
-.playlist-cover-strip strong {
-  display: block;
-  color: #4a5553;
-}
-
-.playlist-cover-strip span {
-  display: block;
-  margin-top: 6px;
-  color: #8f9996;
-  font-size: 12px;
-}
-
-.input-shell {
-  position: relative;
-  flex: 1;
-}
-
-.input-shell input {
-  width: 100%;
-  height: 56px;
-  padding: 0 16px 0 48px;
-  border: 1px solid rgba(191, 198, 196, 0.3);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.6);
-  outline: none;
-}
-
-.input-shell input:focus {
-  border-color: rgba(111, 143, 114, 0.5);
-  box-shadow: 0 0 0 4px rgba(111, 143, 114, 0.12);
-}
-
-.song-panel {
-  margin-top: 32px;
-  overflow: hidden;
-  border-radius: 32px;
-}
-
-.song-toolbar,
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.song-toolbar {
-  padding: 24px 32px;
-  border-bottom: 1px solid rgba(191, 198, 196, 0.16);
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.check-all {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e5eaf5;
+  background: #fff;
+  color: #6782d8;
+  border-radius: 9px;
   cursor: pointer;
-}
-
-.check-all strong,
-.song-meta strong,
-.queue-meta strong {
-  display: block;
-  color: #4a5553;
-}
-
-.check-all span {
-  font-size: 11px;
-  color: #8f9996;
-}
-
-.song-list,
-.queue-list,
-.log-list {
-  overflow: auto;
-}
-
-.song-row,
-.queue-row,
-.log-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.song-row {
-  padding: 20px 32px;
-  border-top: 1px solid rgba(191, 198, 196, 0.12);
-}
-
-.song-avatar {
-  width: 48px;
-  height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 16px;
-  background: rgba(191, 198, 196, 0.2);
 }
 
-.song-cover {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 16px;
-  flex: none;
-  box-shadow: 0 4px 10px rgba(74, 85, 83, 0.08);
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.song-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.song-meta strong,
-.queue-meta strong {
-  word-break: break-word;
-}
-
-.song-size {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(191, 198, 196, 0.14);
-  color: rgba(74, 85, 83, 0.55);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.song-submeta {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #a1aaa8;
-}
-
-.drop-panel {
-  min-height: 380px;
+.transfer-view {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+.transfer-header {
+  padding: 18px 30px 12px;
+  border-bottom: 1px solid #edf0f6;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-  border: 2px dashed rgba(191, 198, 196, 0.45);
-  border-radius: 48px;
-  background: rgba(255, 255, 255, 0.4);
-  text-align: center;
-  transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
-.drop-panel.dragging {
-  background: rgba(111, 143, 114, 0.1);
-  border-color: #6f8f72;
-  box-shadow: inset 0 0 0 1px rgba(111, 143, 114, 0.08);
+.transfer-title-wrap h2 {
+  margin: 0;
 }
 
-.upload-orb {
-  width: 80px;
-  height: 80px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 24px;
+.tabs {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  border: 1px solid #e2e8f5;
+  background: #fff;
+  color: #7d8493;
   border-radius: 999px;
-  background: #e8e2d8;
-  color: #6f8f72;
-  box-shadow: 0 8px 18px rgba(74, 85, 83, 0.08);
+  padding: 7px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
-.drop-panel strong {
-  color: #f2a65a;
+.tab-btn.active {
+  color: var(--blue);
+  border-color: #cddcff;
+  background: #edf2ff;
+  box-shadow: 0 4px 12px rgba(50, 103, 255, 0.15);
 }
 
-.dark-btn,
-.accent-btn,
-.outline-btn,
-.green-btn {
-  padding: 14px 24px;
-  border-radius: 18px;
-  font-weight: 700;
-}
-
-.dark-btn {
-  background: #4a5553;
-  color: #fff;
-}
-
-.dark-btn:hover,
-.green-btn:hover {
-  background: #6f8f72;
-}
-
-.dark-btn:disabled,
-.accent-btn:disabled,
-.outline-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.outline-btn {
+.ghost-btn {
+  border: 0;
   background: transparent;
-  color: #4a5553;
-  border: 1px solid rgba(191, 198, 196, 0.5);
+  color: #8a90a0;
+  padding: 8px 10px;
 }
 
-.accent-btn {
-  background: #f2a65a;
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(242, 166, 90, 0.18);
-}
-
-.green-btn {
-  background: #6f8f72;
-  color: #fff;
-}
-
-.offline-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 24px;
-  margin-top: 24px;
-}
-
-.queue-panel,
-.log-panel {
-  padding: 28px;
-  border-radius: 32px;
-}
-
-.progress-line,
-.taskbar-progress {
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(191, 198, 196, 0.24);
-}
-
-.progress-line {
-  margin-top: 18px;
-}
-
-.progress-value,
-.taskbar-progress-value {
-  height: 100%;
-  background: #6f8f72;
-  border-radius: inherit;
-  transition: width 0.25s ease;
-}
-
-.queue-list,
-.log-list {
-  max-height: 360px;
-  margin-top: 18px;
-  padding-right: 6px;
-}
-
-.queue-row,
-.log-row {
-  align-items: flex-start;
-  padding: 16px 0;
-  border-top: 1px solid rgba(191, 198, 196, 0.14);
-}
-
-.queue-meta,
-.log-row p {
+.transfer-list {
+  padding: 14px 30px 26px;
+  overflow: auto;
   flex: 1;
-  min-width: 0;
 }
 
-.queue-meta span,
-.log-row p {
+.task-card {
+  border: 1px solid #edf0f6;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.task-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.task-row strong {
+  display: block;
+}
+
+.task-row p {
+  margin: 3px 0 0;
+  color: #8a90a0;
+  font-size: 12px;
+}
+
+.task-progress-side {
+  min-width: 84px;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.mini-track {
+  width: 80px;
+  height: 4px;
+  border-radius: 999px;
+  background: #edf2ff;
+  overflow: hidden;
+}
+
+.mini-value {
+  height: 100%;
+  background: var(--blue);
+}
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #f4f6fa;
+  padding: 12px 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-row.open-ok {
+  background: rgba(40, 184, 88, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(40, 184, 88, 0.18);
+}
+
+.history-row.open-error {
+  background: rgba(203, 68, 68, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(203, 68, 68, 0.18);
+}
+
+.history-main strong {
+  display: block;
+}
+
+.history-main p {
+  margin: 3px 0 0;
+  color: #8a90a0;
+  font-size: 12px;
   word-break: break-word;
 }
 
-.queue-state,
-.log-badge {
-  flex: none;
-  padding: 6px 12px;
-  border-radius: 999px;
+.history-detail {
+  margin-top: 6px;
+}
+
+.history-detail summary {
+  list-style: none;
+  cursor: pointer;
+  color: #6f7d99;
   font-size: 12px;
-  font-weight: 700;
+  user-select: none;
 }
 
-.queue-state.pending,
-.log-badge.info {
-  background: rgba(191, 198, 196, 0.24);
-  color: #6f8f72;
-}
-
-.queue-state.processing,
-.log-badge.warn {
-  background: rgba(242, 166, 90, 0.14);
-  color: #d88739;
-}
-
-.queue-state.done,
-.log-badge.success {
-  background: rgba(111, 143, 114, 0.14);
-  color: #6f8f72;
-}
-
-.queue-state.error,
-.log-badge.error {
-  background: rgba(204, 122, 110, 0.16);
-  color: #b45e4f;
-}
-
-.empty-panel {
-  margin-top: 18px;
-  padding: 28px 20px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.22);
-  color: #8f9996;
-  text-align: center;
-}
-
-.empty-panel.compact {
-  min-height: 160px;
-  display: grid;
-  place-items: center;
-}
-
-.taskbar {
-  height: 96px;
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 48px;
-  background: rgba(255, 255, 255, 0.6);
-  border-top: 1px solid rgba(191, 198, 196, 0.2);
-  backdrop-filter: blur(8px);
-}
-
-.taskbar-side,
-.taskbar-actions {
-  width: 25%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.taskbar-actions {
-  justify-content: flex-end;
-}
-
-.task-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background: rgba(191, 198, 196, 0.16);
-}
-
-.task-icon.active {
-  background: rgba(242, 166, 90, 0.14);
-}
-
-.taskbar-center {
-  flex: 1;
-  max-width: 480px;
-}
-
-.taskbar-progress-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 16px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #6f8f72;
-}
-
-.taskbar-empty {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  color: rgba(74, 85, 83, 0.55);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-}
-
-.taskbar-empty span {
-  flex: 1;
-  height: 1px;
-  background: rgba(191, 198, 196, 0.3);
-}
-
-.taskbar-empty p {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hidden-input {
+.history-detail summary::-webkit-details-marker {
   display: none;
 }
 
-.custom-scroll::-webkit-scrollbar {
-  width: 4px;
+.history-detail summary::before {
+  content: "+";
+  display: inline-block;
+  width: 14px;
+  font-weight: 700;
 }
 
-.custom-scroll::-webkit-scrollbar-thumb {
-  background: #bfc6c4;
+.history-detail[open] summary::before {
+  content: "-";
+}
+
+.history-main .history-error {
+  color: #ba3f3f;
+}
+
+.history-status {
+  height: 24px;
   border-radius: 999px;
-}
-
-.icon.folder,
-.icon.info,
-.icon.link,
-.icon.music,
-.icon.upload,
-.icon.refresh {
-  width: 18px;
-  height: 18px;
-}
-
-.icon.folder::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 4px;
-  width: 18px;
-  height: 11px;
-  border: 2px solid currentColor;
-  border-radius: 4px;
-}
-
-.icon.folder::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 0;
-  width: 8px;
-  height: 5px;
-  border: 2px solid currentColor;
-  border-bottom: 0;
-  border-radius: 4px 4px 0 0;
-}
-
-.icon.info::before {
-  content: "i";
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  border: 2px solid currentColor;
-  border-radius: 50%;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
   font-size: 12px;
   font-weight: 700;
 }
 
-.icon.link::before,
-.icon.link::after {
-  content: "";
+.history-actions {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+}
+
+.folder-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e4e9f5;
+  background: #fff;
+  color: #6f7d99;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.folder-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.folder-btn::after {
+  content: attr(data-tip);
   position: absolute;
-  width: 10px;
-  height: 6px;
-  border: 2px solid currentColor;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: #1f2634;
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 7px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.folder-btn:hover::after {
+  opacity: 1;
+}
+
+.folder-feedback {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.folder-feedback.ok {
+  color: #2b8f58;
+}
+
+.folder-feedback.error {
+  color: #bf4141;
+}
+
+.history-status.done {
+  background: #e9f9ef;
+  color: #2b8f58;
+}
+
+.history-status.error {
+  background: #fdeeee;
+  color: #bf4141;
+}
+
+.empty {
+  text-align: center;
+  color: #9ba2b1;
+  padding: 48px 0;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 76px);
+  opacity: 0;
+  background: #1f2634;
+  color: #fff;
   border-radius: 999px;
-  transform: rotate(-24deg);
+  padding: 10px 14px;
+  font-size: 13px;
+  transition: all 0.24s ease;
+  pointer-events: none;
 }
 
-.icon.link::before {
-  left: 0;
-  top: 6px;
+.toast.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
 }
 
-.icon.link::after {
-  right: 0;
-  top: 2px;
-}
+.custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #dbe2f2; border-radius: 999px; }
 
-.icon.music::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 1px;
-  width: 2px;
-  height: 12px;
-  background: currentColor;
-}
-
-.icon.music::after {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 10px;
-  width: 7px;
-  height: 7px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-}
-
-.icon.upload::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 1px;
-  width: 2px;
-  height: 11px;
-  background: currentColor;
-}
-
-.icon.upload::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 8px;
-  height: 8px;
-  border-left: 2px solid currentColor;
-  border-top: 2px solid currentColor;
-  transform: rotate(45deg);
-}
-
-.icon.refresh::before,
-.icon.refresh::after {
-  content: "";
-  position: absolute;
-  border: 2px solid currentColor;
-  border-color: currentColor transparent transparent transparent;
-  border-radius: 50%;
-}
-
-.icon.refresh::before {
-  inset: 1px;
-}
-
-.icon.refresh::after {
-  inset: 4px;
-}
-
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 960px) {
-  .topbar,
-  .content,
-  .taskbar {
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .nav-tabs {
-    gap: 20px;
-  }
-
-  .offline-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .playlist-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .taskbar {
-    height: auto;
-    flex-wrap: wrap;
-    padding-top: 16px;
-    padding-bottom: 16px;
-  }
-
-  .taskbar-side,
-  .taskbar-actions,
-  .taskbar-center {
-    width: 100%;
-    max-width: none;
-  }
-
-  .taskbar-actions {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 720px) {
-  .topbar {
-    height: auto;
-    flex-wrap: wrap;
-    padding-top: 18px;
-    padding-bottom: 18px;
-  }
-
-  .content {
-    padding: 20px 14px;
-  }
-
-  .hero-card,
-  .queue-panel,
-  .log-panel {
-    padding: 20px;
-    border-radius: 24px;
-  }
-
-  .drop-panel {
-    min-height: 300px;
-    border-radius: 28px;
-  }
-
-  .playlist-form,
-  .song-toolbar,
-  .section-head,
-  .song-row,
-  .queue-row,
-  .log-row {
+@media (max-width: 900px) {
+  .quark-app {
     flex-direction: column;
-    align-items: stretch;
   }
 
-  .nav-tabs {
+  .sidebar {
     width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid #eef1f6;
+    flex-direction: row;
     justify-content: space-between;
+    padding: 10px 12px;
   }
 
-  .taskbar-actions {
-    flex-wrap: wrap;
+  .sidebar-title {
+    margin: 0;
+  }
+
+  .side-nav {
+    width: auto;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .side-item {
+    width: 72px;
+    padding: 8px 0 6px;
+  }
+
+  .home-view,
+  .transfer-header,
+  .transfer-list {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .search-initial {
+    transform: translateY(8vh);
+  }
+
+  .result-table-wrap {
+    max-height: 52vh;
+  }
+}
+
+@media (max-width: 620px) {
+  .search-action-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .action-buttons {
+    width: 100%;
+  }
+
+  .primary-btn,
+  .line-btn {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .result-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tabs {
+    width: 100%;
+  }
+
+  .tab-btn {
+    flex: 1;
+    text-align: center;
   }
 }
 </style>

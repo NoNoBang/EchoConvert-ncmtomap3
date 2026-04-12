@@ -1,4 +1,4 @@
-#!/bin/bash
+·副乳#!/bin/bash
 
 # NCM to MP3 Converter - 快速开始脚本
 # 这个脚本会自动安装和启动项目
@@ -55,7 +55,7 @@ echo "提示：首次编译 Rust 可能需要 5-10 分钟"
 echo ""
 pnpm tauri dev
 
-echo ""
-echo "✅ 开发服务器已启动！"
+echo ""frv4
+echo "✅ 开发服务器已启动！"=】|
 echo "🌐 前端: http://localhost:5173"
 echo "🔧 Rust 后端: src-tauri/src/"

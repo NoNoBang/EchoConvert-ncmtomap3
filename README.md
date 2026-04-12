@@ -1,6 +1,37 @@
-# NCM to MP3 Converter
+# EchoConvert
 
 一个基于 Tauri 2.0 + Vue 3 + Rust 构建的网易云音乐 NCM 格式转 MP3 格式的桌面应用程序。
+
+## 📦 下载与发布
+
+- GitHub Releases 下载地址：
+  [https://github.com/NoNoBang/Music-Format-Conversion/releases](https://github.com/NoNoBang/Music-Format-Conversion/releases)
+- macOS 用户下载 `.dmg`（或 `.app.zip`）安装包。
+- Windows 用户下载 `.msi`（或 `.exe`）安装包。
+
+## 🚀 自动发布流程（GitHub Actions）
+
+仓库已配置 `tag` 自动发布流程：推送 `v*` 标签后会自动构建并上传 macOS/Windows 安装包到 Releases。
+
+```bash
+# 1) 更新版本号（package.json 与 src-tauri/tauri.conf.json）
+# 2) 提交代码
+git add .
+git commit -m "release: v1.0.0"
+git push origin main
+
+# 3) 打标签并推送触发自动发布
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+> 工作流文件：`.github/workflows/release.yml`
+
+## ⚠️ 未签名安装提示（首版）
+
+- 当前首版默认未进行代码签名/公证，目的是先快速打通发布链路。
+- macOS：首次运行可能提示“无法验证开发者”，可在“系统设置 > 隐私与安全性”中放行后打开。
+- Windows：SmartScreen 可能提示“未知发布者”，可选择“仍要运行”继续安装。
 
 ## ✨ 功能特点
 
