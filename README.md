@@ -1,143 +1,52 @@
 # EchoConvert
 
-一个基于 Tauri 2.0 + Vue 3 + Rust 构建的网易云音乐 NCM 格式转 MP3 格式的桌面应用程序。
+轻量的 WYY 歌单下载桌面工具（Tauri + Vue + Rust）。
 
-## 📦 下载与发布
+## 主要功能
 
-- GitHub Releases 下载地址：
-  [https://github.com/NoNoBang/EchoConvert/releases](https://github.com/NoNoBang/EchoConvert/releases)
-- macOS 用户下载 `.dmg`（或 `.app.zip`）安装包。
-- Windows 用户下载 `.msi`（或 `.exe`）安装包。
+1. WYY 歌单一键导入  
+输入歌单链接或歌单 ID，自动解析歌曲列表。
 
-## 🚀 自动发布流程（GitHub Actions）
+2. 下载 MP3 到本地  
+支持单曲下载和批量下载，传输页可查看实时进度与历史记录。
 
-仓库已配置 `tag` 自动发布流程：推送 `v*` 标签后会自动构建并上传 macOS/Windows 安装包到 Releases。
+## 下载地址
+
+- Releases: [https://github.com/NoNoBang/EchoConvert/releases](https://github.com/NoNoBang/EchoConvert/releases)
+- macOS：下载 `.dmg`（或 `.app.zip`）
+- Windows：下载 `.msi`（或 `.exe`）
+
+## 自动发布（GitHub Actions）
+
+仓库使用 `tag` 自动发布流程：推送 `v*` 标签后，自动构建 macOS/Windows 安装包并上传到 Releases。
 
 ```bash
-# 1) 更新版本号（package.json 与 src-tauri/tauri.conf.json）
-# 2) 提交代码
 git add .
 git commit -m "release: v1.0.0"
 git push origin main
 
-# 3) 打标签并推送触发自动发布
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-> 工作流文件：`.github/workflows/release.yml`
+工作流文件：`.github/workflows/release.yml`
+
+## 本地开发
+
+```bash
+pnpm install
+pnpm tauri dev
+```
 
 ## ⚠️ 未签名安装提示（首版）
 
-- 当前首版默认未进行代码签名/公证，目的是先快速打通发布链路。
-- macOS：首次运行可能提示“无法验证开发者”，可在“系统设置 > 隐私与安全性”中放行后打开。
-- Windows：SmartScreen 可能提示“未知发布者”，可选择“仍要运行”继续安装。
-
-## ✨ 功能特点
-
-### 🎵 音频转换
-- 高质量转换：完整实现网易云音乐 NCM 格式解密算法
-- 保持原始质量：转换后的 MP3 文件保持原始音质
-- 支持批量处理：可同时转换多个 NCM 文件
-
-### 📁 智能文件处理
-- 拖拽支持：直接将文件或文件夹拖拽到应用窗口
-- 文件选择：通过按钮选择单个文件或整个文件夹
-- 递归搜索：自动遍历文件夹及子文件夹，找出所有 NCM 文件
-- 智能过滤：自动跳过非 NCM 文件，只处理有效文件
-
-### 🎛️ 用户界面
-- 现代化设计：简洁直观的用户界面
-- 实时进度：显示转换进度条和当前处理文件
-- 详细日志：提供完整的转换过程日志记录
-- 状态反馈：成功/失败状态的清晰展示
-
-### 🔧 技术特性
-- 跨平台：支持 Windows、macOS 和 Linux
-- 高性能：使用 Rust 后端，转换速度快
-- 安全可靠：本地处理，不上传任何文件
-
-## 🚀 使用方法
-
-### 方式一：拖拽操作
-1. 打开应用程序
-2. 将 NCM 文件或包含 NCM 文件的文件夹直接拖拽到应用窗口
-3. 应用会自动开始转换过程
-
-### 方式二：手动选择
-1. 点击 "Select Files" 按钮选择单个或多个 NCM 文件
-2. 或点击 "Select Folder" 按钮选择包含 NCM 文件的文件夹
-3. 应用会自动开始转换过程
-
-### 转换结果
-- 转换后的 MP3 文件保存在与原 NCM 文件相同的目录下
-- 文件名保持不变，仅扩展名改为 .mp3
-- 应用会显示详细的转换日志和结果
-
-## 📋 系统要求
-
-- 操作系统：Windows 10+、macOS 10.15+、Linux (主流发行版)
-- 内存：建议 4GB 以上
-- 存储空间：转换时需要足够的磁盘空间存储输出文件
-
-## 🛠️ 开发环境
-
-### 技术栈
-- **前端**：Vue 3 + Vite
-- **后端**：Rust + Tauri 2.0
-- **加密处理**：AES-128 ECB + RC4 流密码
-- **界面库**：原生 CSS + 响应式设计
-
-### 开发要求
-- Node.js 18+
-- Rust 1.70+
-- pnpm (推荐) 或 npm
-
-### 本地开发
-
-```bash
-# 安装依赖
-pnpm install
-
-# 开发模式运行
-pnpm tauri dev
-
-# 构建应用
-pnpm tauri build
-```
-
-## 📖 项目结构
-
-```
-ncm2mp3/
-├── src/                    # Vue 前端代码
-│   ├── App.vue            # 主应用组件
-│   └── main.js            # 应用入口
-├── src-tauri/             # Rust 后端代码
-│   ├── src/
-│   │   ├── lib.rs         # NCM 解密核心逻辑
-│   │   └── main.rs        # 应用主入口
-│   ├── Cargo.toml         # Rust 依赖配置
-│   └── tauri.conf.json    # Tauri 应用配置
-├── index.html             # HTML 入口
-├── vite.config.js         # Vite 配置
-├── package.json           # 项目依赖
-└── README.md              # 项目说明
-```
-
-## 🔐 安全说明
-
-- **本地处理**：所有文件转换均在本地进行，不会上传到任何服务器
-- **开源透明**：完整源代码公开，可自行审查安全性
-- **无网络依赖**：转换过程不需要网络连接
+- 当前首版默认未做代码签名/公证，优先打通发布链路。
+- macOS 首次运行可能提示“无法验证开发者”，可在“系统设置 > 隐私与安全性”放行。
+- Windows 可能出现 SmartScreen 提示，可选择“仍要运行”继续安装。
 
 ## 📄 许可证
 
-本项目仅供学习和个人使用。请尊重音乐版权，仅转换您拥有合法使用权的音乐文件。
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request 来改进这个项目。
+本项目仅供学习和个人使用。请尊重音乐版权，仅下载您拥有合法使用权的内容。
 
 ## ⚠️ 免责声明
 
