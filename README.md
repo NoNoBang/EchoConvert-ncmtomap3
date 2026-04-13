@@ -2,12 +2,6 @@
 
 轻量的 WYY 歌单下载桌面工具（Tauri + Vue + Rust）。
 
-## 界面预览
-
-![首页预览](./readmesrc/image.png)
-
-![解析结果预览](./readmesrc/image1.jpg)
-
 ## 主要功能
 
 1. WYY 歌单一键导入  
@@ -15,6 +9,10 @@
 
 2. 下载 MP3 到本地  
 支持单曲下载和批量下载，传输页可查看实时进度与历史记录。
+
+## 界面预览
+
+![首页预览](./readmesrc/image1.jpg)
 
 ## 下载地址
 
