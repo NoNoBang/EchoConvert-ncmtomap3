@@ -6,7 +6,7 @@
 
 ![首页预览](./readmesrc/image.png)
 
-![解析结果预览](./readmesrc/image1.png)
+![解析结果预览](./readmesrc/image1.jpg)
 
 ## 主要功能
 
