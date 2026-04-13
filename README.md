@@ -2,6 +2,12 @@
 
 轻量的 WYY 歌单下载桌面工具（Tauri + Vue + Rust）。
 
+## 界面预览
+
+![首页预览](./readmesrc/image.png)
+
+![解析结果预览](./readmesrc/image1.png)
+
 ## 主要功能
 
 1. WYY 歌单一键导入  
